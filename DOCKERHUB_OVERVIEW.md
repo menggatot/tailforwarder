@@ -2,6 +2,10 @@
 
 This Docker image allows you to forward network traffic between your local LAN and your Tailscale network, or vice-versa. It utilizes a macvlan network for the container to obtain its own IP address on your LAN and employs `iptables` for granular traffic control.
 
+---
+
+**Source code and issues:** [https://github.com/menggatot/tailforwarder](https://github.com/menggatot/tailforwarder)
+
 ## Features
 
 *   **LAN to Tailscale Forwarding**: Access Tailscale nodes (100.x.y.z) or IPs within advertised Tailscale routes from your local network via this container's LAN IP.

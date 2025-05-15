@@ -2,6 +2,8 @@
 
 This project provides a Dockerized solution for forwarding network traffic between your local LAN and your Tailscale network, or vice-versa. It uses a macvlan network for the container to have its own IP on your LAN and utilizes `iptables` for fine-grained traffic manipulation.
 
+**Docker Hub:** [menggatot/tailforwarder](https://hub.docker.com/r/menggatot/tailforwarder)
+
 ## Features
 
 *   **LAN to Tailscale Forwarding**: Access specific Tailscale node IPs (100.x.y.z) or IPs within advertised routes from your local network via this container's LAN IP.
@@ -35,6 +37,44 @@ This project provides a Dockerized solution for forwarding network traffic betwe
 
 ## Installation and Setup
 
+You can either use the prebuilt image from Docker Hub or build the image yourself.
+
+### Option 1: Use the Prebuilt Image from Docker Hub (Recommended)
+
+1.  **Clone or Download:**
+    If this project is in a Git repository:
+    ```bash
+    git clone <repository-url>
+    cd <repository-directory>
+    ```
+    Or simply download the `docker-compose.yml` and `.env.example` files into a directory on your host.
+
+2.  **Edit `docker-compose.yml`:**
+    Ensure the following line is present under `services.tailforwarder`:
+    ```yaml
+    image: menggatot/tailforwarder:latest
+    ```
+    (This is already set in the provided `docker-compose.yml`.)
+
+3.  **Configure Environment Variables:**
+    Copy the example environment file:
+    ```bash
+    cp .env.example .env
+    ```
+    Edit `.env` with your details as described below.
+
+4.  **Start the Container:**
+    ```bash
+    docker-compose up -d
+    ```
+    (No `--build` flag is needed when using the prebuilt image.)
+
+---
+
+### Option 2: Build the Image Locally (Advanced/Development)
+
+If you want to modify the Dockerfile or scripts, or prefer to build the image yourself:
+
 1.  **Clone or Download:**
     If this project is in a Git repository:
     ```bash
@@ -42,6 +82,27 @@ This project provides a Dockerized solution for forwarding network traffic betwe
     cd <repository-directory>
     ```
     Otherwise, download all the files (`docker-compose.yml`, `Dockerfile`, `entrypoint.sh`, `iptables-config.sh`, `.env.example`) into a single directory on your host.
+
+2.  **Edit `docker-compose.yml`:**
+    Comment out or remove the `image:` line and uncomment or add the `build:` section:
+    ```yaml
+    # image: menggatot/tailforwarder:latest
+    build: .
+    ```
+
+3.  **Configure Environment Variables:**
+    Copy the example environment file:
+    ```bash
+    cp .env.example .env
+    ```
+    Edit `.env` with your details as described below.
+
+4.  **Build and Start the Container:**
+    ```bash
+    docker-compose up -d --build
+    ```
+
+---
 
 2.  **Configure Environment Variables:**
     Copy the example environment file:
@@ -209,7 +270,21 @@ The forwarding mechanism relies on a combination of Tailscale, Docker networking
 
 ## Updating
 
-1.  **Pull Changes (if using Git):**
+If you are using the prebuilt image from Docker Hub (recommended):
+
+1.  **Pull the latest image:**
+    ```bash
+    docker-compose pull
+    ```
+2.  **Restart the container:**
+    ```bash
+    docker-compose up -d
+    ```
+    This will recreate the container with the latest image.
+
+If you are building the image locally (for development or custom changes):
+
+1.  **Pull changes (if using Git):**
     ```bash
     git pull
     ```
