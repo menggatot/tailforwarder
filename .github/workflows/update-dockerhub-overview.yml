@@ -1,0 +1,21 @@
+name: Update Docker Hub Overview
+
+on:
+  push:
+    paths:
+      - 'DOCKERHUB_OVERVIEW.md'
+
+jobs:
+  update-overview:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Update Docker Hub description
+        uses: peter-evans/dockerhub-description@v4
+        with:
+            username: ${{ secrets.DOCKERHUB_USERNAME }}
+            password: ${{ secrets.DOCKERHUB_TOKEN }}
+            repository: menggatot/tailforwarder
+            short-description: ${{ github.event.repository.description }}
+            readme-filepath: DOCKERHUB_OVERVIEW.md
+            enable-url-completion: false

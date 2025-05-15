@@ -1,0 +1,68 @@
+# .gitignore
+
+# --- Secrets & Local Configuration ---
+# The actual .env file containing sensitive information like TS_AUTHKEY
+.env
+
+# --- Tailscale State ---
+# Persisted Tailscale state directory. This can contain node keys and other sensitive data.
+# It's typically a volume or bind mount, so shouldn't be in git anyway, but good to list.
+/tailscale_state/
+tailscale_state/
+
+# --- Build artifacts & OS generated files ---
+# Docker build cache (if any local build context files are generated)
+.dockerignore
+
+# macOS specific
+.DS_Store
+*.AppleDouble
+.LSOverride
+
+# Windows specific
+Thumbs.db
+ehthumbs.db
+ehthumbs_vista.db
+*.stackdump
+[Dd]esktop.ini
+
+# IDE and editor specific files
+.idea/
+.vscode/
+*.swp
+*~
+*.sublime-project
+*.sublime-workspace
+
+# --- Python ---
+# Python virtual environment
+venv/
+.venv/
+ENV/
+env/
+# Python bytecode
+__pycache__/
+*.py[cod]
+*$py.class
+
+# --- Node.js ---
+node_modules/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+package-lock.json # If you prefer to only commit package.json and let CI/CD generate lock
+yarn.lock         # Same as above
+
+# --- General ---
+# Log files
+*.log
+logs/
+*.log.*
+
+# Temporary files
+*.tmp
+*.temp
+
+# Backup files
+*.bak
+*.backup
