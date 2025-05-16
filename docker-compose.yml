@@ -1,145 +1,145 @@
 version: '3.8'
+
 services:
-  tailforwarder:
-    # build: . # Assumes Dockerfile is in the current directory
-    image: menggatot/tailforwarder:latest # Use the pre-built image from Docker Hub
-    container_name: tailforwarder
-    hostname: ${TS_HOSTNAME:-tailforwarder} # Uses TS_HOSTNAME from .env or defaults
+  tailforwarder-one:
+    image: menggatot/tailforwarder:latest
+    container_name: tailforwarder-one
+    hostname: tailforwarder-one # Unique hostname for Tailscale
     restart: unless-stopped
     cap_add:
-      - NET_ADMIN       # Required for iptables manipulation and network interface management
-      # - SYS_MODULE    # Usually not needed if /dev/net/tun is present and TS_USERSPACE=false
+      - NET_ADMIN
     devices:
-      - "/dev/net/tun:/dev/net/tun" # Allows Tailscale to create the 'tailscale0' interface
+      - "/dev/net/tun:/dev/net/tun"
     sysctls:
-      - net.ipv4.ip_forward=1         # Enable kernel IP forwarding for IPv4
-      - net.ipv6.conf.all.forwarding=1 # Enable kernel IP forwarding for IPv6 (if you plan to use it)
-    env_file:
-      - .env # Loads TS_AUTHKEY and other TS_* variables for entrypoint.sh
+      - net.ipv4.ip_forward=1
+      - net.ipv6.conf.all.forwarding=1 # Enable if using IPv6
     environment:
-      # --- Core Tailscale Settings (handled by entrypoint.sh) ---
-      # TS_AUTHKEY: set in .env
-      # TS_HOSTNAME: set in .env or defaults in compose
-      # TS_ROUTES_ADVERTISE: set in .env (for 'tailscale up --advertise-routes=$TS_ROUTES_ADVERTISE')
-      # TS_TAGS_ADVERTISE: set in .env (for 'tailscale up --advertise-tags=$TS_TAGS_ADVERTISE')
-      # TS_ACCEPT_ROUTES: set in .env (for 'tailscale up --accept-routes' or '--accept-routes=false')
-      # TS_EXTRA_ARGS: set in .env (for additional 'tailscale up' flags)
+      # --- Core Tailscale Settings ---
+      - TS_AUTHKEY=${TS_AUTHKEY} # Must be set in the environment or a .env file read by docker-compose
+      - TS_HOSTNAME=tailforwarder-one # Matches hostname above
+      - TS_USERSPACE=false
+      - TS_STATE_DIR=/var/lib/tailscale
+      # - TS_ROUTES= # Not advertising routes for this scenario
+      # - TS_TAGS=tag:tailforwarder
+      - TS_ACCEPT_ROUTES=false # Not strictly needed for direct local to TS IP forwarding
+      # - TS_EXTRA_ARGS=
 
-      - TS_USERSPACE=false # IMPORTANT: Use kernel mode Tailscale for iptables integration
-      - TS_STATE_DIR=/var/lib/tailscale # Persistent state for Tailscale
-
-      # --- Variables for iptables-config.sh ---
-      #
-      # MACVLAN_IFACE: The name of the macvlan interface inside THIS container.
-      # Usually 'eth0' if it's the primary macvlan interface.
+      # --- Variables for iptables-config.sh for tailforwarder-one ---
       - MACVLAN_IFACE=eth0
+      - TS_PEER_UDP_PORT=41641 # Optional: Tailscaled listening port
 
-      # --- SCENARIO 1: Forward traffic from your Local LAN TO a specific Tailscale Node IP ---
-      # Devices on your LAN connect to <LISTEN_IP_ON_MACVLAN>:<port> (this container's LAN IP)
-      # and the traffic is forwarded to <TARGET_TS_IP_FROM_LOCAL>:<port> (a Tailscale node).
-      #
-      # - ENABLE_LOCAL_TO_TS: "true" or "false"
-      # - LISTEN_IP_ON_MACVLAN: This container's IP address on the macvlan network (your LAN).
-      #                           MUST MATCH ipv4_address below. Can be auto-detected by script if empty.
-      # - TARGET_TS_IP_FROM_LOCAL: The direct Tailscale IP (100.x.y.z) of the target node.
-      # - EXCLUDE_PORTS_TCP: Comma-separated list of TCP ports NOT to forward (e.g., "22,8080"). All others ARE forwarded.
-      # - EXCLUDE_PORTS_UDP: Comma-separated list of UDP ports NOT to forward.
-      #
-      # Example: Access a service on Tailscale node 100.x.y.z from your LAN via 10.10.10.200
-      # (This is the ACTIVE example in this template)
+      # --- SCENARIO for tailforwarder-one (Local LAN to specific Tailscale Node) ---
       - ENABLE_LOCAL_TO_TS=true
-      - LISTEN_IP_ON_MACVLAN=10.10.10.200   # Must match networks.macvlan_net.ipv4_address
-      - TARGET_TS_IP_FROM_LOCAL=100.x.y.z # Replace with an actual Tailscale IP on your network
-      - EXCLUDE_PORTS_TCP=                  # Example: "22" to not forward SSH via this
+      - LISTEN_IP_ON_MACVLAN=10.10.0.10   # This container's IP on the macvlan network
+      - TARGET_TS_IP_FROM_LOCAL=100.x.y.z  # <<< REPLACE WITH ACTUAL TARGET TAILSCALE IP >>>
+      - EXCLUDE_PORTS_TCP=22               # Example: Don't forward SSH
       - EXCLUDE_PORTS_UDP=
-
-      # --- SCENARIO 2: Forward traffic from Tailscale Network TO a specific IP on your Local LAN ---
-      # Other Tailscale nodes connect to <this-container-tailscale-ip>:<port>
-      # and the traffic is forwarded to <DESTINATION_IP_FROM_TS>:<port> on your LAN.
-      #
-      # - ENABLE_TS_TO_LOCAL: "true" or "false"
-      # - DESTINATION_IP_FROM_TS: The IP on your local LAN to forward to.
-      #
-      # Example: Access a web server at 10.10.0.50 on your LAN via Tailscale
-      # - ENABLE_TS_TO_LOCAL=true
-      # - DESTINATION_IP_FROM_TS=10.10.0.50
-
-      # --- SCENARIO 3: Forward traffic from your Local LAN TO an IP within an Advertised Route on Tailscale ---
-      # This is a variation of SCENARIO 2. The target is not a direct Tailscale node IP (100.x.y.z)
-      # but an IP within a subnet that another Tailscale node is advertising (and this container is accepting).
-      # For this to work, TS_ACCEPT_ROUTES must be "true" (or effectively true by default) in your .env
-      # and the remote Tailscale node must be advertising the route containing TARGET_SUBNET_IP_FROM_LOCAL.
-      #
-      # The iptables-config.sh script handles this identically to SCENARIO 2; the key difference
-      # is that TARGET_TS_IP_FROM_LOCAL will be an IP like 10.0.20.1 instead of 100.x.y.z.
-      # Tailscale itself handles routing to that subnet via the advertising node.
-      #
-      # To make this the active example, comment out SCENARIO 2's settings and uncomment/adjust these:
-      # - ENABLE_LOCAL_TO_TS=true
-      # - LISTEN_IP_ON_MACVLAN=10.10.10.200
-      # - TARGET_TS_IP_FROM_LOCAL=10.0.20.1 # IP within a subnet advertised by another Tailscale node
-      # - EXCLUDE_PORTS_TCP=
-      # - EXCLUDE_PORTS_UDP=
-      #
-      # REMEMBER: For this scenario, ensure TS_ACCEPT_ROUTES=true is set in your .env file.
-
-      # --- SCENARIO 4: Full Subnet Router from Tailscale to Local LAN ---
-      # This container acts as a full exit node or subnet router for your Tailscale network
-      # allowing other Tailscale nodes to access your *entire* LAN (e.g., 10.10.0.0/24).
-      # This usually involves:
-      # 1. Setting TS_ROUTES_ADVERTISE=10.10.0.0/24 (or your LAN subnet) in .env
-      # 2. Enabling those routes in the Tailscale Admin Console for this node.
-      # 3. The iptables-config.sh script might not need specific rules for this if Tailscale's
-      #    own routing and masquerading (when --advertise-routes is used) is sufficient.
-      #    However, if you need more complex NAT or specific forwarding *within* this scenario,
-      #    you might adapt ENABLE_TS_TO_LOCAL.
-      #
-      # This template does not explicitly configure iptables for this, as 'tailscale up --advertise-routes'
-      # often handles the necessary SNAT/MASQUERADE. If it doesn't, you'd need:
-      # - ENABLE_TS_TO_LOCAL=true (or a similar flag)
-      # - And iptables rules like:
-      #   iptables -t nat -A POSTROUTING -o $MACVLAN_IFACE -s <tailscale_network_cidr> -j MASQUERADE
-      #   iptables -A FORWARD -i $TAILSCALE_IFACE -o $MACVLAN_IFACE -j ACCEPT
-      # (This is more advanced and depends on how Tailscale handles advertised routes NAT)
-
-      # --- SCENARIO 5: Full Subnet Router from Local LAN to Tailscale Network ---
-      # This container acts as a gateway for your *entire* LAN to reach your *entire* Tailscale network.
-      # This requires:
-      # 1. Configuring a static route on your main LAN router:
-      #    Destination: <Tailscale_IP_Range, e.g., 100.64.0.0/10 or specific advertised subnets>
-      #    Gateway: <LISTEN_IP_ON_MACVLAN, e.g., 10.10.10.200>
-      # 2. The iptables-config.sh would need rules to MASQUERADE traffic from LAN to Tailscale.
-      #    This is similar to SCENARIO 2 but without a specific -d <target_ip> in PREROUTING,
-      #    and relying on the LAN router to send relevant traffic to this container.
-      #
-      #    - ENABLE_LOCAL_TO_TS=true (or a similar flag)
-      #    - LISTEN_IP_ON_MACVLAN=10.10.10.200 (as the gateway)
-      #    - TARGET_TS_IP_FROM_LOCAL: This would not be used for DNAT in this case.
-      #                               Instead, just MASQUERADE and FORWARD.
-      #    - iptables rules might look like:
-      #      iptables -t nat -A POSTROUTING -o $TAILSCALE_IFACE -s <your_lan_cidr> -j MASQUERADE
-      #      iptables -A FORWARD -i $MACVLAN_IFACE -o $TAILSCALE_IFACE -j ACCEPT
-      # (This is more advanced and might require changes to iptables-config.sh)
+      - ENABLE_TS_TO_LOCAL=false           # Disable TS_TO_LOCAL scenario
+      # - DESTINATION_IP_FROM_TS=          # Not used in this scenario
 
     volumes:
-      - ./tailscale_state:/var/lib/tailscale # Persist Tailscale node identity and state
+      - ./tailscale_state_one:/var/lib/tailscale # Unique persistent state for this instance
     networks:
       macvlan_net:
-        # This IP MUST match LISTEN_IP_ON_MACVLAN if you are using Local -> TS forwarding
-        # and want to use a static IP.
-        ipv4_address: 10.10.10.200 # The IP this container will have on your LAN
+        ipv4_address: 10.10.0.10 # Static IP for this instance
+
+  tailforwarder-two:
+    image: menggatot/tailforwarder:latest
+    container_name: tailforwarder-two
+    hostname: tailforwarder-two # Unique hostname for Tailscale
+    restart: unless-stopped
+    cap_add:
+      - NET_ADMIN
+    devices:
+      - "/dev/net/tun:/dev/net/tun"
+    sysctls:
+      - net.ipv4.ip_forward=1
+      - net.ipv6.conf.all.forwarding=1
+    environment:
+      # --- Core Tailscale Settings ---
+      - TS_AUTHKEY=${TS_AUTHKEY} # Must be set in the environment or a .env file read by docker-compose
+      - TS_HOSTNAME=tailforwarder-two # Matches hostname above
+      - TS_USERSPACE=false
+      - TS_STATE_DIR=/var/lib/tailscale
+      # - TS_ROUTES= # Not advertising routes for this scenario
+      # - TS_TAGS=tag:tailforwarder
+      - TS_ACCEPT_ROUTES=true # REQUIRED to see and use routes from other Tailscale nodes
+      # - TS_EXTRA_ARGS=
+
+      # --- Variables for iptables-config.sh for tailforwarder-two ---
+      - MACVLAN_IFACE=eth0
+      - TS_PEER_UDP_PORT=41642 # Optional: Tailscaled listening port
+
+      # --- SCENARIO for tailforwarder-two (Local LAN to an IP within an Advertised Route from another TS node) ---
+      - ENABLE_LOCAL_TO_TS=true
+      - LISTEN_IP_ON_MACVLAN=10.10.0.20   # This container's IP on the macvlan network
+      - TARGET_TS_IP_FROM_LOCAL=192.168.x.y # <<< REPLACE WITH ACTUAL TARGET IP IN ADVERTISED SUBNET >>>
+      - EXCLUDE_PORTS_TCP=
+      - EXCLUDE_PORTS_UDP=
+      - ENABLE_TS_TO_LOCAL=false           # Disable TS_TO_LOCAL scenario
+      # - DESTINATION_IP_FROM_TS=          # Not used in this scenario
+
+    volumes:
+      - ./tailscale_state_two:/var/lib/tailscale # Unique persistent state for this instance
+    networks:
+      macvlan_net:
+        ipv4_address: 10.10.0.20 # Static IP for this instance
+
+  tailforwarder-three:
+    image: menggatot/tailforwarder:latest
+    container_name: tailforwarder-three
+    hostname: tailforwarder-three # Unique hostname for Tailscale
+    restart: unless-stopped
+    cap_add:
+      - NET_ADMIN
+    devices:
+      - "/dev/net/tun:/dev/net/tun"
+    sysctls:
+      - net.ipv4.ip_forward=1
+      - net.ipv6.conf.all.forwarding=1
+    environment:
+      # --- Core Tailscale Settings ---
+      - TS_AUTHKEY=${TS_AUTHKEY} # Must be set in the environment or a .env file read by docker-compose
+      - TS_HOSTNAME=tailforwarder-three # Matches hostname above
+      - TS_USERSPACE=false
+      - TS_STATE_DIR=/var/lib/tailscale
+      # - TS_ROUTES= # Not advertising routes for this scenario by default
+      # - TS_TAGS=tag:ts-to-local
+      - TS_ACCEPT_ROUTES=false # Not strictly needed unless also accessing other TS advertised routes
+      # - TS_EXTRA_ARGS=
+
+      # --- Variables for iptables-config.sh for tailforwarder-three ---
+      - MACVLAN_IFACE=eth0
+      - TS_PEER_UDP_PORT=41643 # Unique Tailscaled listening port
+
+      # --- SCENARIO for tailforwarder-three (Tailscale Network to specific Local LAN IP) ---
+      - ENABLE_TS_TO_LOCAL=true
+      - DESTINATION_IP_FROM_TS=192.168.x.y  # <<< REPLACE WITH YOUR ACTUAL TARGET LOCAL LAN IP >>>
+      - ENABLE_LOCAL_TO_TS=false           # Disable LOCAL_TO_TS scenario
+      # - LISTEN_IP_ON_MACVLAN=10.10.0.30  # Not strictly needed if ENABLE_LOCAL_TO_TS=false
+      # - TARGET_TS_IP_FROM_LOCAL=        # Not used in this scenario
+      # - EXCLUDE_PORTS_TCP=
+      # - EXCLUDE_PORTS_UDP=
+
+    volumes:
+      - ./tailscale_state_three:/var/lib/tailscale # Unique persistent state for this instance
+    networks:
+      macvlan_net:
+        ipv4_address: 10.10.0.30 # Static IP for this instance
 
 networks:
   macvlan_net:
     driver: macvlan
     driver_opts:
-      parent: eth0 # IMPORTANT: Your RPi's (or host's) physical LAN interface
+      parent: eth0 # IMPORTANT: Change 'eth0' to your host's physical LAN interface name
     ipam:
       config:
-        - subnet: 10.10.10.0/24   # Your LAN's subnet
-          gateway: 10.10.10.1    # Your LAN's gateway (usually your main router)
-          # ip_range: 10.10.10.160/28 # Optional: if you want Docker to pick from a specific range for macvlan
+        - subnet: 10.10.0.0/24   # IMPORTANT: Adjust to your LAN's subnet
+          gateway: 10.10.0.1    # IMPORTANT: Adjust to your LAN's gateway
+          # ip_range: 10.10.0.160/28 # Optional: if you want Docker to pick from a pool
 
-volumes:
-  tailscale_state: # Defines the named volume. If using a bind mount like ./tailscale_state,
-                   # this top-level definition isn't strictly needed unless specifying 'external: true' etc.
+# Named volumes (alternative to bind mounts if you prefer Docker to manage them)
+# volumes:
+#   tailscale_state_one:
+#   tailscale_state_two:
+#   tailscale_state_three:

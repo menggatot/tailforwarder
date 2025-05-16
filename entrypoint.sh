@@ -52,6 +52,10 @@ sleep 3
 log_info "Constructing 'tailscale up' arguments..."
 UP_ARGS="--accept-dns=false"
 
+if [ -n "$TS_AUTHKEY" ]; then
+    UP_ARGS="$UP_ARGS --authkey=$TS_AUTHKEY"
+fi
+
 # Hostname:
 # If TS_HOSTNAME is not set, we default to 'tailforwarder'.
 DESIRED_HOSTNAME=${TS_HOSTNAME:-"tailforwarder"}
