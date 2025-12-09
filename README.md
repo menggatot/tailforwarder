@@ -151,3 +151,16 @@ The primary method for configuration is through environment variables set direct
     *   `DESTINATION_IP_FROM_TS`: The actual IP address of the target device on your local LAN (e.g., `10.10.0.50`). Traffic sent to this container's Tailscale IP will be forwarded to this local IP.
 
 Ensure `ENABLE_LOCAL_TO_TS` and `ENABLE_TS_TO_LOCAL` are set appropriately for each instance to avoid conflicting rules (typically one is `true` and the other `false` per instance).
+
+## Automated Tailscale Updates
+
+This project includes an automated workflow that keeps Tailscale up to date:
+
+*   **Scheduled Updates**: The workflow runs automatically every Monday at 9:00 AM UTC to check for the latest Tailscale version.
+*   **Manual Trigger**: You can manually trigger the update workflow at any time from the GitHub Actions tab.
+*   **Automatic Rebuild**: When the workflow runs, it:
+    1. Checks the latest version of Tailscale from the official `tailscale/tailscale:latest` Docker image
+    2. Triggers a rebuild of the `menggatot/tailforwarder` Docker image
+    3. Pushes the updated image to Docker Hub with the latest Tailscale version
+
+The Docker image is automatically rebuilt to incorporate the latest Tailscale updates, ensuring you always have access to the newest features and security patches.

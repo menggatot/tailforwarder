@@ -182,3 +182,12 @@ The main configuration is done via environment variables. `TS_AUTHKEY` is global
     *   `DESTINATION_IP_FROM_TS`: The actual IP address of the target device on your local LAN that you want to expose to Tailscale.
 
 Typically, for a given instance, either `ENABLE_LOCAL_TO_TS` or `ENABLE_TS_TO_LOCAL` will be `true`, and the other `false`, to define its specific role.
+
+## Automated Updates
+
+This image is automatically updated weekly to include the latest Tailscale version. The automated workflow:
+*   Checks for the latest Tailscale release every Monday at 9:00 AM UTC
+*   Rebuilds and pushes the image to Docker Hub with the latest Tailscale version
+*   Ensures you always have access to the newest Tailscale features and security patches
+
+Simply pull the `latest` tag to get the most recent version.
