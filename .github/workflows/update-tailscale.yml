@@ -75,7 +75,12 @@ jobs:
           GH_TOKEN: ${{ github.token }}
         run: |
           echo "Triggering Docker build to update to Tailscale version ${{ steps.check-version.outputs.version }}"
-          gh workflow run docker-publish.yml
+          if gh workflow run docker-publish.yml; then
+            echo "Successfully triggered Docker build workflow"
+          else
+            echo "Error: Failed to trigger Docker build workflow"
+            exit 1
+          fi
 
       - name: Create summary
         run: |
