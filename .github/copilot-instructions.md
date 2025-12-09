@@ -97,7 +97,10 @@ This project does not currently have automated tests. Testing is performed throu
 
 ### Shell Scripts
 
-- **Shebang:** Use `#!/bin/sh` for POSIX compatibility or `#!/bin/bash` when bash-specific features are needed
+- **Shebang:** 
+  - Use `#!/bin/sh` for simple, portable scripts that don't require bash-specific features
+  - Use `#!/bin/bash` when you need bash-specific features (arrays, advanced string manipulation, etc.)
+  - Current scripts use bash features, so prefer `#!/bin/bash` or ensure `/bin/sh` points to bash
 - **Error Handling:** Use `set -e` to exit on errors
 - **Logging Functions:** Use consistent logging prefixes:
   - `log_info()` / `log()` for informational messages
@@ -117,6 +120,7 @@ This project does not currently have automated tests. Testing is performed throu
 ### Dockerfile
 
 - **Base Image:** Always use official Tailscale image: `FROM tailscale/tailscale:latest`
+  - Note: We intentionally use `latest` to ensure the container always has the most recent Tailscale version with security updates and features
 - **Package Management:** Use `apk` (Alpine Linux package manager)
 - **Minimize Layers:** Combine related commands with `&&`
 - **Cleanup:** Remove cache after installs: `apk add --no-cache`
@@ -125,7 +129,7 @@ This project does not currently have automated tests. Testing is performed throu
 
 ### Docker Compose
 
-- **Version:** Use version 3.8 or later
+- **Version:** Use version 3.8 (as currently defined in docker-compose.yml)
 - **Service Naming:** Use descriptive names with hyphens: `tailforwarder-one`
 - **Environment Variables:**
   - Use `${VAR}` syntax for .env file substitution
