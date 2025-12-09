@@ -4,24 +4,79 @@ on:
   push:
     branches: [ "main" ]
   workflow_dispatch:
+  schedule:
+    # Run weekly on Mondays at 9:00 AM UTC to check for Tailscale updates
+    - cron: '0 9 * * 1'
 
 jobs:
   build_and_push:
     runs-on: ubuntu-latest
+    permissions:
+      contents: write
     steps:
     - name: Checkout repository
       uses: actions/checkout@v4
 
+    - name: Check for Tailscale updates
+      if: github.event_name == 'schedule' || github.event_name == 'workflow_dispatch'
+      id: check-version
+      run: |
+        echo "Checking latest Tailscale version from Docker Hub..."
+        
+        # Pull the latest tailscale/tailscale image
+        docker pull tailscale/tailscale:latest
+        
+        # Get the Tailscale version from the image with error handling
+        TAILSCALE_VERSION=$(docker run --rm tailscale/tailscale:latest tailscale version 2>/dev/null | head -n 1 | awk '{print $1}')
+        
+        if [ -z "$TAILSCALE_VERSION" ]; then
+          echo "Error: Failed to extract Tailscale version"
+          exit 1
+        fi
+        
+        echo "Latest Tailscale version: $TAILSCALE_VERSION"
+        echo "version=$TAILSCALE_VERSION" >> $GITHUB_OUTPUT
+        
+        # Check if we have a previous version stored in the repo
+        if [ -f ".tailscale-version" ]; then
+          CURRENT_VERSION=$(cat .tailscale-version)
+          echo "Current stored version: $CURRENT_VERSION"
+          
+          if [ "$CURRENT_VERSION" = "$TAILSCALE_VERSION" ]; then
+            echo "No update needed - already at version $CURRENT_VERSION"
+            echo "should_build=false" >> $GITHUB_OUTPUT
+          else
+            echo "Update available: $CURRENT_VERSION -> $TAILSCALE_VERSION"
+            echo "should_build=true" >> $GITHUB_OUTPUT
+          fi
+        else
+          echo "No previous version found - triggering build"
+          echo "should_build=true" >> $GITHUB_OUTPUT
+        fi
+
+    - name: Update version file
+      if: (github.event_name == 'schedule' || github.event_name == 'workflow_dispatch') && steps.check-version.outputs.should_build == 'true'
+      run: |
+        echo "${{ steps.check-version.outputs.version }}" > .tailscale-version
+        git config user.name "github-actions[bot]"
+        git config user.email "github-actions[bot]@users.noreply.github.com"
+        git add .tailscale-version
+        git commit -m "Update Tailscale version to ${{ steps.check-version.outputs.version }}"
+        git push
+
     - name: Set up Docker Buildx
+      if: github.event_name == 'push' || (steps.check-version.outputs.should_build == 'true')
       uses: docker/setup-buildx-action@v3
 
     - name: Log in to Docker Hub
+      if: github.event_name == 'push' || (steps.check-version.outputs.should_build == 'true')
       uses: docker/login-action@v3
       with:
         username: ${{ secrets.DOCKERHUB_USERNAME }}
         password: ${{ secrets.DOCKERHUB_TOKEN }}
 
     - name: Build and push Docker image
+      if: github.event_name == 'push' || (steps.check-version.outputs.should_build == 'true')
       uses: docker/build-push-action@v5
       with:
         context: .
