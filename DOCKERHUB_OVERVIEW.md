@@ -11,6 +11,7 @@ This Docker image allows you to forward network traffic between your local LAN a
 *   **Multiple Forwarding Scenarios via Separate Instances**:
     *   **LAN to Tailscale Forwarding**: Access Tailscale nodes (100.x.y.z) or IPs within advertised Tailscale routes from your local network via a dedicated container instance's LAN IP.
     *   **Tailscale to LAN Forwarding**: Expose services on your local LAN to your Tailscale network via a dedicated container instance's Tailscale IP.
+    *   **Exit Node**: Use the container as a Tailscale exit node to route all internet traffic from Tailscale clients through the container's network interface.
 *   **Flexible Configuration**: Control forwarding rules and Tailscale settings per instance via environment variables in `docker-compose.yml`.
 *   **Macvlan Integration**: Each instance operates with a dedicated IP address on your LAN.
 *   **Persistent Tailscale State**: Each instance saves its Tailscale node identity in a dedicated volume.
@@ -113,6 +114,33 @@ services:
       macvlan_net:
         ipv4_address: 10.10.0.30 # Static LAN IP for this instance
 
+  tailforwarder-exit: # Scenario: Exit Node for routing internet traffic
+    image: menggatot/tailforwarder:latest
+    container_name: tailforwarder-exit
+    hostname: tailforwarder-exit
+    restart: unless-stopped
+    cap_add: [NET_ADMIN]
+    devices: ["/dev/net/tun:/dev/net/tun"]
+    sysctls:
+      net.ipv4.ip_forward: 1
+      net.ipv6.conf.all.forwarding: 1
+    environment:
+      - TS_AUTHKEY=${TS_AUTHKEY} # From .env file
+      - TS_HOSTNAME=tailforwarder-exit
+      - TS_USERSPACE=false
+      - TS_STATE_DIR=/var/lib/tailscale
+      - TS_EXTRA_ARGS=--advertise-exit-node # Required for exit node
+      - MACVLAN_IFACE=eth0
+      - TS_PEER_UDP_PORT=41644 # Unique port
+      - ENABLE_EXIT_NODE=true # Enable exit node functionality
+      - ENABLE_LOCAL_TO_TS=false
+      - ENABLE_TS_TO_LOCAL=false
+    volumes:
+      - ./tailscale_state_exit:/var/lib/tailscale # Unique state volume
+    networks:
+      macvlan_net:
+        ipv4_address: 10.10.0.40 # Static LAN IP for this instance
+
 networks:
   macvlan_net:
     driver: macvlan
@@ -128,6 +156,7 @@ networks:
 # ./tailscale_state_one
 # ./tailscale_state_two
 # ./tailscale_state_three
+# ./tailscale_state_exit
 ```
 
 Create a `.env` file in the same directory as your `docker-compose.yml`. This file is primarily for your `TS_AUTHKEY`:
@@ -180,5 +209,9 @@ The main configuration is done via environment variables. `TS_AUTHKEY` is global
     *   `EXCLUDE_PORTS_UDP`: Comma-separated UDP ports to *exclude* from this forwarding rule.
 *   `ENABLE_TS_TO_LOCAL`: Set to `true` to enable forwarding from the Tailscale network (to this instance's Tailscale IP) to a specific IP on your Local LAN.
     *   `DESTINATION_IP_FROM_TS`: The actual IP address of the target device on your local LAN that you want to expose to Tailscale.
+*   `ENABLE_EXIT_NODE`: Set to `true` to configure the container as a Tailscale exit node.
+    *   When enabled, all internet traffic from Tailscale clients using this exit node will be routed through the container's network interface.
+    *   `TS_EXTRA_ARGS`: Should include `--advertise-exit-node` to advertise the exit node capability.
+    *   `ENABLE_LOCAL_TO_TS` and `ENABLE_TS_TO_LOCAL`: Should both be set to `false` when using exit node mode.
 
-Typically, for a given instance, either `ENABLE_LOCAL_TO_TS` or `ENABLE_TS_TO_LOCAL` will be `true`, and the other `false`, to define its specific role.
+Typically, for a given instance, only one of `ENABLE_LOCAL_TO_TS`, `ENABLE_TS_TO_LOCAL`, or `ENABLE_EXIT_NODE` will be `true`, to define its specific role.

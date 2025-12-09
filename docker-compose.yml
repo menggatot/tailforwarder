@@ -127,6 +127,46 @@ services:
       macvlan_net:
         ipv4_address: 10.10.0.30 # Static IP for this instance
 
+  # tailforwarder-exit:
+  #   image: menggatot/tailforwarder:latest
+  #   container_name: tailforwarder-exit
+  #   hostname: tailforwarder-exit # Unique hostname for Tailscale
+  #   restart: unless-stopped
+  #   cap_add:
+  #     - NET_ADMIN
+  #   devices:
+  #     - "/dev/net/tun:/dev/net/tun"
+  #   sysctls:
+  #     - net.ipv4.ip_forward=1
+  #     - net.ipv6.conf.all.forwarding=1
+  #   environment:
+  #     # --- Core Tailscale Settings ---
+  #     - TS_AUTHKEY=${TS_AUTHKEY} # Must be set in the environment or a .env file read by docker-compose
+  #     - TS_HOSTNAME=tailforwarder-exit # Matches hostname above
+  #     - TS_USERSPACE=false
+  #     - TS_STATE_DIR=/var/lib/tailscale
+  #     - TS_EXTRA_ARGS=--advertise-exit-node # Required to advertise as exit node
+  #     # - TS_TAGS=tag:exit-node
+  #     - TS_ACCEPT_ROUTES=false # Not needed for exit node
+  #
+  #     # --- Variables for iptables-config.sh for tailforwarder-exit ---
+  #     - MACVLAN_IFACE=eth0
+  #     - TS_PEER_UDP_PORT=41644 # Unique Tailscaled listening port
+  #
+  #     # --- SCENARIO for tailforwarder-exit (Exit Node) ---
+  #     - ENABLE_EXIT_NODE=true            # Enable exit node functionality
+  #     - ENABLE_LOCAL_TO_TS=false         # Disable LOCAL_TO_TS scenario
+  #     - ENABLE_TS_TO_LOCAL=false         # Disable TS_TO_LOCAL scenario
+  #     # - LISTEN_IP_ON_MACVLAN=10.10.0.40 # Not needed for exit node
+  #     # - TARGET_TS_IP_FROM_LOCAL=        # Not used in this scenario
+  #     # - DESTINATION_IP_FROM_TS=         # Not used in this scenario
+  #
+  #   volumes:
+  #     - ./tailscale_state_exit:/var/lib/tailscale # Unique persistent state for this instance
+  #   networks:
+  #     macvlan_net:
+  #       ipv4_address: 10.10.0.40 # Static IP for this instance
+
 networks:
   macvlan_net:
     driver: macvlan
@@ -143,3 +183,4 @@ networks:
 #   tailscale_state_one:
 #   tailscale_state_two:
 #   tailscale_state_three:
+#   tailscale_state_exit:

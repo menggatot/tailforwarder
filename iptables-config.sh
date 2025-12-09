@@ -12,6 +12,7 @@ set -e
 # EXCLUDE_PORTS_TCP
 # EXCLUDE_PORTS_UDP
 # TS_PEER_UDP_PORT
+# ENABLE_EXIT_NODE
 
 TAILSCALE_IFACE="tailscale0"
 
@@ -113,6 +114,20 @@ elif [ "$ENABLE_LOCAL_TO_TS" = "true" ]; then
     log "Using provided LISTEN_IP_ON_MACVLAN: $LISTEN_IP_ON_MACVLAN"
 fi
 
+log "Validating scenario configuration..."
+ENABLED_SCENARIOS=0
+[ "$ENABLE_TS_TO_LOCAL" = "true" ] && ENABLED_SCENARIOS=$((ENABLED_SCENARIOS + 1))
+[ "$ENABLE_LOCAL_TO_TS" = "true" ] && ENABLED_SCENARIOS=$((ENABLED_SCENARIOS + 1))
+[ "$ENABLE_EXIT_NODE" = "true" ] && ENABLED_SCENARIOS=$((ENABLED_SCENARIOS + 1))
+
+if [ $ENABLED_SCENARIOS -gt 1 ]; then
+  error_exit "Multiple forwarding scenarios enabled. Only one of ENABLE_TS_TO_LOCAL, ENABLE_LOCAL_TO_TS, or ENABLE_EXIT_NODE should be true per instance."
+fi
+
+if [ $ENABLED_SCENARIOS -eq 0 ]; then
+  warn "No forwarding scenario enabled. At least one of ENABLE_TS_TO_LOCAL, ENABLE_LOCAL_TO_TS, or ENABLE_EXIT_NODE should be true for this container to function as a forwarder."
+fi
+
 log "Clearing existing NAT and Filter FORWARD rules..."
 run_cmd iptables -t nat -F PREROUTING
 run_cmd iptables -t nat -F POSTROUTING
@@ -186,6 +201,20 @@ if [ "$ENABLE_LOCAL_TO_TS" = "true" ]; then
   log "Local to Tailscale forwarding configured for $TARGET_TS_IP_FROM_LOCAL."
 else
   log "Local to Tailscale forwarding is disabled."
+fi
+
+if [ "$ENABLE_EXIT_NODE" = "true" ]; then
+  log "Configuring Exit Node forwarding..."
+  
+  log "Allowing traffic forwarding from Tailscale to internet via $MACVLAN_IFACE"
+  run_cmd iptables -A FORWARD -i "$TAILSCALE_IFACE" -o "$MACVLAN_IFACE" -m state --state NEW -j ACCEPT
+  
+  log "Masquerading outgoing internet traffic from Tailscale"
+  run_cmd iptables -t nat -A POSTROUTING -o "$MACVLAN_IFACE" -j MASQUERADE
+  
+  log "Exit Node forwarding configured successfully."
+else
+  log "Exit Node forwarding is disabled."
 fi
 
 log "IPTables configuration complete. Forwarder should be active."
