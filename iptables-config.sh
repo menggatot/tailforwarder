@@ -193,9 +193,9 @@ if [ "$ENABLE_EXIT_NODE" = "true" ]; then
   log "Configuring Exit Node forwarding..."
   
   log "Allowing traffic forwarding from Tailscale to internet via $MACVLAN_IFACE"
-  run_cmd iptables -A FORWARD -i "$TAILSCALE_IFACE" -o "$MACVLAN_IFACE" -j ACCEPT
+  run_cmd iptables -A FORWARD -i "$TAILSCALE_IFACE" -o "$MACVLAN_IFACE" -m state --state NEW -j ACCEPT
   
-  log "Masquerading outgoing internet traffic"
+  log "Masquerading outgoing internet traffic from Tailscale"
   run_cmd iptables -t nat -A POSTROUTING -o "$MACVLAN_IFACE" -j MASQUERADE
   
   log "Exit Node forwarding configured successfully."
