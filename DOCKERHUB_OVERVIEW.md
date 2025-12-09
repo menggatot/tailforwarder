@@ -129,6 +129,7 @@ services:
       - TS_HOSTNAME=tailforwarder-exit
       - TS_USERSPACE=false
       - TS_STATE_DIR=/var/lib/tailscale
+      - TS_ACCEPT_DNS=true # Optional: Accept Tailscale DNS configuration
       - TS_EXTRA_ARGS=--advertise-exit-node # Required for exit node
       - MACVLAN_IFACE=eth0
       - TS_PEER_UDP_PORT=41644 # Unique port
@@ -191,6 +192,7 @@ The main configuration is done via environment variables. `TS_AUTHKEY` is global
 #### Core Tailscale Settings (for each instance)
 *   `TS_HOSTNAME`: The hostname this specific container instance will use on the Tailscale network (e.g., `tailforwarder-one`).
 *   `TS_ACCEPT_ROUTES`: Set to `true` if this instance should accept routes advertised by other nodes on your Tailscale network. Necessary for forwarding traffic to IPs within those advertised routes.
+*   `TS_ACCEPT_DNS`: Set to `true` to accept Tailscale's DNS configuration. Default: `false`. When enabled, the container will use Tailscale's DNS servers (including MagicDNS). Leave as `false` (default) for most forwarding scenarios.
 *   `TS_USERSPACE`: Determines if Tailscale runs in userspace or kernel mode. `false` (kernel mode) is recommended. Default: `false`.
 *   `TS_STATE_DIR`: Directory inside the container for Tailscale state. Default: `/var/lib/tailscale`. Mapped to a unique persistent host volume per instance.
 *   `TS_PEER_UDP_PORT`: Specifies the UDP port `tailscaled` for this instance should listen on. **Must be unique per instance on the same host.** Example: `41641`.
@@ -212,6 +214,7 @@ The main configuration is done via environment variables. `TS_AUTHKEY` is global
 *   `ENABLE_EXIT_NODE`: Set to `true` to configure the container as a Tailscale exit node.
     *   When enabled, all internet traffic from Tailscale clients using this exit node will be routed through the container's network interface.
     *   `TS_EXTRA_ARGS`: Should include `--advertise-exit-node` to advertise the exit node capability.
+    *   `TS_ACCEPT_DNS`: Optionally set to `true` to accept Tailscale's DNS configuration.
     *   `ENABLE_LOCAL_TO_TS` and `ENABLE_TS_TO_LOCAL`: Should both be set to `false` when using exit node mode.
 
 Typically, for a given instance, only one of `ENABLE_LOCAL_TO_TS`, `ENABLE_TS_TO_LOCAL`, or `ENABLE_EXIT_NODE` will be `true`, to define its specific role.

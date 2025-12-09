@@ -50,7 +50,15 @@ log_info "Waiting a few seconds for tailscaled to initialize..."
 sleep 3
 
 log_info "Constructing 'tailscale up' arguments..."
-UP_ARGS="--accept-dns=false"
+
+# Accept DNS
+if [ "$TS_ACCEPT_DNS" = "true" ]; then
+    log_info "TS_ACCEPT_DNS is true. Adding --accept-dns=true."
+    UP_ARGS="--accept-dns=true"
+else
+    log_info "TS_ACCEPT_DNS is not 'true' (or not set). Adding --accept-dns=false (default behavior)."
+    UP_ARGS="--accept-dns=false"
+fi
 
 if [ -n "$TS_AUTHKEY" ]; then
     UP_ARGS="$UP_ARGS --authkey=$TS_AUTHKEY"
