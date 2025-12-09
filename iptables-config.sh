@@ -114,6 +114,20 @@ elif [ "$ENABLE_LOCAL_TO_TS" = "true" ]; then
     log "Using provided LISTEN_IP_ON_MACVLAN: $LISTEN_IP_ON_MACVLAN"
 fi
 
+log "Validating scenario configuration..."
+ENABLED_SCENARIOS=0
+[ "$ENABLE_TS_TO_LOCAL" = "true" ] && ENABLED_SCENARIOS=$((ENABLED_SCENARIOS + 1))
+[ "$ENABLE_LOCAL_TO_TS" = "true" ] && ENABLED_SCENARIOS=$((ENABLED_SCENARIOS + 1))
+[ "$ENABLE_EXIT_NODE" = "true" ] && ENABLED_SCENARIOS=$((ENABLED_SCENARIOS + 1))
+
+if [ $ENABLED_SCENARIOS -gt 1 ]; then
+  error_exit "Multiple forwarding scenarios enabled. Only one of ENABLE_TS_TO_LOCAL, ENABLE_LOCAL_TO_TS, or ENABLE_EXIT_NODE should be true per instance."
+fi
+
+if [ $ENABLED_SCENARIOS -eq 0 ]; then
+  warn "No forwarding scenario enabled. At least one of ENABLE_TS_TO_LOCAL, ENABLE_LOCAL_TO_TS, or ENABLE_EXIT_NODE should be true for this container to function as a forwarder."
+fi
+
 log "Clearing existing NAT and Filter FORWARD rules..."
 run_cmd iptables -t nat -F PREROUTING
 run_cmd iptables -t nat -F POSTROUTING
