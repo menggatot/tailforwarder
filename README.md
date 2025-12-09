@@ -123,7 +123,7 @@ Once the containers are running and Tailscale is connected in each:
     *   `ENABLE_EXIT_NODE=true`
     *   `ENABLE_LOCAL_TO_TS=false`
     *   `ENABLE_TS_TO_LOCAL=false`
-    *   Optionally, `TS_ACCEPT_DNS=true` to accept Tailscale DNS and reduce DNS-related log noise from Tailscale clients
+    *   Optionally, `TS_ACCEPT_DNS=true` to accept Tailscale's DNS configuration
     *   Tailscale clients can use this container as an exit node to route all their internet traffic through the container's network interface, appearing to the internet with the container's public IP address.
 
 ## Environment Variables Overview
@@ -138,7 +138,7 @@ The primary method for configuration is through environment variables set direct
 #### Core Tailscale Configuration (per instance)
 *   `TS_HOSTNAME`: The hostname this specific container instance will use on the Tailscale network (e.g., `tailforwarder-one`).
 *   `TS_ACCEPT_ROUTES`: Set to `true` if this instance should accept routes advertised by other Tailscale nodes. Essential for "LAN to Advertised Tailscale Route" scenarios.
-*   `TS_ACCEPT_DNS`: Set to `true` to accept Tailscale's DNS configuration. Default: `false`. When enabled, the container will use Tailscale's DNS servers (including MagicDNS). This is useful for exit nodes to reduce DNS-related log noise and enable Tailscale DNS features. Leave as `false` (default) for most forwarding scenarios.
+*   `TS_ACCEPT_DNS`: Set to `true` to accept Tailscale's DNS configuration. Default: `false`. When enabled, the container will use Tailscale's DNS servers (including MagicDNS). Leave as `false` (default) for most forwarding scenarios.
 *   `TS_USERSPACE`: Default `false`. Kernel mode is recommended.
 *   `TS_STATE_DIR`: Default `/var/lib/tailscale`. Mapped to a unique host volume for each instance.
 *   `TS_PEER_UDP_PORT`: A unique UDP port for each `tailscaled` instance if running multiple on the same host Docker engine (e.g., `41641`, `41642`, `41643`).
