@@ -1,0 +1,48 @@
+name: Update Tailscale
+
+on:
+  # Run weekly on Mondays at 9:00 AM UTC
+  schedule:
+    - cron: '0 9 * * 1'
+  # Allow manual trigger
+  workflow_dispatch:
+
+jobs:
+  check-and-update:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      actions: write
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Get current Tailscale version from base image
+        id: check-version
+        run: |
+          echo "Checking latest Tailscale version from Docker Hub..."
+          
+          # Pull the latest tailscale/tailscale image
+          docker pull tailscale/tailscale:latest
+          
+          # Get the Tailscale version from the image
+          TAILSCALE_VERSION=$(docker run --rm tailscale/tailscale:latest tailscale version | head -n 1 | awk '{print $1}')
+          echo "Latest Tailscale version: $TAILSCALE_VERSION"
+          echo "version=$TAILSCALE_VERSION" >> $GITHUB_OUTPUT
+
+      - name: Trigger Docker build workflow
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          echo "Triggering Docker build to update to Tailscale version ${{ steps.check-version.outputs.version }}"
+          gh workflow run docker-publish.yml
+
+      - name: Create summary
+        run: |
+          echo "## Tailscale Update Check" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "**Latest Tailscale Version:** ${{ steps.check-version.outputs.version }}" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "✅ Docker build workflow has been triggered to rebuild with the latest Tailscale version." >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "The Docker image will be rebuilt and pushed with the latest Tailscale base image." >> $GITHUB_STEP_SUMMARY
