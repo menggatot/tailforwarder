@@ -12,6 +12,7 @@ set -e
 # EXCLUDE_PORTS_TCP
 # EXCLUDE_PORTS_UDP
 # TS_PEER_UDP_PORT
+# ENABLE_EXIT_NODE
 
 TAILSCALE_IFACE="tailscale0"
 
@@ -186,6 +187,20 @@ if [ "$ENABLE_LOCAL_TO_TS" = "true" ]; then
   log "Local to Tailscale forwarding configured for $TARGET_TS_IP_FROM_LOCAL."
 else
   log "Local to Tailscale forwarding is disabled."
+fi
+
+if [ "$ENABLE_EXIT_NODE" = "true" ]; then
+  log "Configuring Exit Node forwarding..."
+  
+  log "Allowing traffic forwarding from Tailscale to internet via $MACVLAN_IFACE"
+  run_cmd iptables -A FORWARD -i "$TAILSCALE_IFACE" -o "$MACVLAN_IFACE" -j ACCEPT
+  
+  log "Masquerading outgoing internet traffic"
+  run_cmd iptables -t nat -A POSTROUTING -o "$MACVLAN_IFACE" -j MASQUERADE
+  
+  log "Exit Node forwarding configured successfully."
+else
+  log "Exit Node forwarding is disabled."
 fi
 
 log "IPTables configuration complete. Forwarder should be active."

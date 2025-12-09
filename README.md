@@ -10,6 +10,7 @@ This project provides a Dockerized solution for forwarding network traffic betwe
     *   **LAN to Tailscale Forwarding**: Access specific Tailscale node IPs (100.x.y.z) from your local network.
     *   **LAN to Advertised Tailscale Route**: Access IPs within routes advertised by other Tailscale nodes from your local network.
     *   **Tailscale to LAN Forwarding**: Expose services on your local LAN to your Tailscale network.
+    *   **Exit Node**: Use the container as a Tailscale exit node to route all internet traffic from Tailscale clients through the container's network interface.
 *   **Flexible Configuration**: Uses environment variables within `docker-compose.yml` to control forwarding rules, Tailscale settings (hostname, advertised routes/tags, accept routes), and `iptables` behavior per instance.
 *   **Macvlan Integration**: Each instance operates with its own dedicated IP address on your LAN for seamless routing.
 *   **Persistent Tailscale State**: Each instance saves its Tailscale node identity and state in a dedicated volume.
@@ -116,6 +117,14 @@ Once the containers are running and Tailscale is connected in each:
     *   `DESTINATION_IP_FROM_TS=10.10.0.50` (replace with actual local device IP)
     *   If `10.10.0.50` has a web server on port 80, devices on your Tailscale network can access it by browsing to `http://tailforwarder-three` (or its Tailscale IP).
 
+*   **Scenario Example: Exit Node**
+    Assuming an exit node instance is configured with:
+    *   `TS_EXTRA_ARGS=--advertise-exit-node`
+    *   `ENABLE_EXIT_NODE=true`
+    *   `ENABLE_LOCAL_TO_TS=false`
+    *   `ENABLE_TS_TO_LOCAL=false`
+    *   Tailscale clients can use this container as an exit node to route all their internet traffic through the container's network interface, appearing to the internet with the container's public IP address.
+
 ## Environment Variables Overview
 
 The primary method for configuration is through environment variables set directly in the `docker-compose.yml` file for each service, and `TS_AUTHKEY` set in the `.env` file.
@@ -149,5 +158,10 @@ The primary method for configuration is through environment variables set direct
 *   **For "Tailscale to Local LAN":**
     *   `ENABLE_TS_TO_LOCAL`: Set to `true`.
     *   `DESTINATION_IP_FROM_TS`: The actual IP address of the target device on your local LAN (e.g., `10.10.0.50`). Traffic sent to this container's Tailscale IP will be forwarded to this local IP.
+*   **For "Exit Node":**
+    *   `ENABLE_EXIT_NODE`: Set to `true` to configure the container as a Tailscale exit node.
+    *   `TS_EXTRA_ARGS`: Should include `--advertise-exit-node` to advertise the exit node capability to Tailscale.
+    *   `ENABLE_LOCAL_TO_TS`: Set to `false`.
+    *   `ENABLE_TS_TO_LOCAL`: Set to `false`.
 
-Ensure `ENABLE_LOCAL_TO_TS` and `ENABLE_TS_TO_LOCAL` are set appropriately for each instance to avoid conflicting rules (typically one is `true` and the other `false` per instance).
+Ensure `ENABLE_LOCAL_TO_TS`, `ENABLE_TS_TO_LOCAL`, and `ENABLE_EXIT_NODE` are set appropriately for each instance to avoid conflicting rules (typically only one is `true` per instance).
